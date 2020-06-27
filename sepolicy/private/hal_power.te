@@ -1,1 +1,2 @@
+allow hal_power proc_touchscreen:dir search;
 allow hal_power proc_touchscreen:file w_file_perms;

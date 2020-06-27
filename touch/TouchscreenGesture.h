@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef VENDOR_LINEAGE_TOUCH_V1_0_TOUCHSCREENGESTURE_H
+#define VENDOR_LINEAGE_TOUCH_V1_0_TOUCHSCREENGESTURE_H
 
+#include <hidl/MQDescriptor.h>
+#include <hidl/Status.h>
 #include <vendor/lineage/touch/1.0/ITouchscreenGesture.h>
-
 #include <map>
 
 namespace vendor {
@@ -28,6 +30,7 @@ namespace implementation {
 
 using ::android::hardware::Return;
 using ::android::hardware::Void;
+using ::android::sp;
 
 class TouchscreenGesture : public ITouchscreenGesture {
   public:
@@ -40,6 +43,7 @@ class TouchscreenGesture : public ITouchscreenGesture {
     typedef struct {
         int32_t keycode;
         const char* name;
+        const char* path;
     } GestureInfo;
     static const std::map<int32_t, GestureInfo> kGestureInfoMap;  // id -> info
 };
@@ -49,3 +53,5 @@ class TouchscreenGesture : public ITouchscreenGesture {
 }  // namespace touch
 }  // namespace lineage
 }  // namespace vendor
+
+#endif  // VENDOR_LINEAGE_TOUCH_V1_0_TOUCHSCREENGESTURE_H
