@@ -17,8 +17,19 @@
 #define LOG_TAG "TouchscreenGestureService"
 
 #include "TouchscreenGesture.h"
-#include <android-base/logging.h>
+
+#include <bitset>
 #include <fstream>
+#include <map>
+#include <type_traits>
+#include <vector>
+
+namespace {
+template <typename T>
+std::enable_if_t<std::is_integral<T>::value, std::string> encode_binary(T i) {
+    return std::bitset<sizeof(T) * 8>(i).to_string();
+}
+}  // anonymous namespace
 
 namespace vendor {
 namespace lineage {
@@ -26,34 +37,34 @@ namespace touch {
 namespace V1_0 {
 namespace implementation {
 
+const std::string kGesturePath = "/proc/driver/gesture_type";
+
 const std::map<int32_t, TouchscreenGesture::GestureInfo> TouchscreenGesture::kGestureInfoMap = {
-    {0, {251, "Two fingers down swipe", "/proc/touchscreen/double_swipe_enable"}},
-    {1, {252, "Up arrow", "/proc/touchscreen/up_arrow_enable"}},
-    {2, {254, "Right arrow", "/proc/touchscreen/right_arrow_enable"}},
-    {3, {255, "Down arrow", "/proc/touchscreen/down_arrow_enable"}},
-    {4, {253, "Left arrow", "/proc/touchscreen/left_arrow_enable"}},
-    {5, {260, "One finger up swipe", "/proc/touchscreen/up_swipe_enable"}},
-    {6, {263, "One finger right swipe", "/proc/touchscreen/right_swipe_enable"}},
-    {7, {261, "One finger down swipe", "/proc/touchscreen/down_swipe_enable"}},
-    {8, {262, "One finger left swipe", "/proc/touchscreen/left_swipe_enable"}},
-    {9, {46, "Letter C", "/proc/touchscreen/letter_c_enable"}},
-    {10, {50, "Letter M", "/proc/touchscreen/letter_m_enable"}},
-    {11, {24, "Letter O", "/proc/touchscreen/letter_o_enable"}},
-    {12, {31, "Letter S", "/proc/touchscreen/letter_s_enable"}},
-    {13, {47, "Letter V","/proc/touchscreen/letter_v_enable"}},
-    {14, {17, "Letter W", "/proc/touchscreen/letter_w_enable"}},
-    {15, {44, "Letter Z", "/proc/touchscreen/letter_z_enable"}},
-    {16, {67, "Single Tap", "/proc/touchscreen/single_tap_enable"}},
-    {17, {143, "Double Tap", "/proc/touchscreen/double_tap_enable"}},
+    // clang-format off
+    {0, {46, "Letter C"}},
+    {1, {18, "Letter e"}},
+    {2, {31, "Letter S"}},
+    {3, {47, "Letter V"}},
+    {4, {17, "Letter W"}},
+    {5, {44, "Letter Z"}},
+    // clang-format on
+};
+
+const uint8_t kKeyMaskGestureControl = 0x40;
+const std::vector<uint8_t> kGestureMasks = {
+    0x04,  // C gesture mask
+    0x08,  // e gesture mask
+    0x10,  // S gesture mask
+    0x01,  // V gesture mask
+    0x20,  // W gesture mask
+    0x02,  // Z gesture mask
 };
 
 Return<void> TouchscreenGesture::getSupportedGestures(getSupportedGestures_cb resultCb) {
     std::vector<Gesture> gestures;
 
     for (const auto& entry : kGestureInfoMap) {
-        if (access(entry.second.path, F_OK) != -1) {
-            gestures.push_back({entry.first, entry.second.name, entry.second.keycode});
-        }
+        gestures.push_back({entry.first, entry.second.name, entry.second.keycode});
     }
     resultCb(gestures);
 
@@ -62,14 +73,17 @@ Return<void> TouchscreenGesture::getSupportedGestures(getSupportedGestures_cb re
 
 Return<bool> TouchscreenGesture::setGestureEnabled(
     const ::vendor::lineage::touch::V1_0::Gesture& gesture, bool enabled) {
-    const auto entry = kGestureInfoMap.find(gesture.id);
-    if (entry == kGestureInfoMap.end()) {
-        return false;
-    }
-
-    std::ofstream file(entry->second.path);
-    file << (enabled ? "1" : "0");
-    LOG(DEBUG) << "Wrote file " << entry->second.path << " fail " << file.fail();
+    uint8_t gestureMode;
+    uint8_t mask = kGestureMasks[gesture.id];
+    std::fstream file(kGesturePath);
+    file >> gestureMode;
+    if (enabled)
+        gestureMode |= mask;
+    else
+        gestureMode &= ~mask;
+    if (gestureMode != 0) gestureMode |= kKeyMaskGestureControl;
+    // Strip first digit
+    file << encode_binary(gestureMode).substr(1);
     return !file.fail();
 }
 
